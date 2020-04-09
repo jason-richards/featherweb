@@ -83,6 +83,9 @@ class FeatherWeb(object):
                 finally:
                     client.close()
 
+        poller.unregister(self.m_Socket)
+
+        
 class HTTPResponse():
 
     def __init__(self, client, content_type="text/html; charset=utf-8", status="200", headers=None):
@@ -115,7 +118,7 @@ class HTTPResponse():
         """ Send a file in response, one chunk at a time.  Caller handles exceptions. """
         with open(filename, 'rb') as f:
             while True:
-                data = f.read(128)
+                data = f.read(chunksize)
                 if not data:
                     break
                 self.client.sendall(data)
