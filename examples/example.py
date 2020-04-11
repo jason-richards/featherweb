@@ -4,16 +4,14 @@ import gc
 app = featherweb.FeatherWeb()
 
 @app.route('/hello')
-def Hello(client):
+def Hello(request):
     """ Say Jello! """
-    response = featherweb.HTTPResponse(client)
-    response.sendtext("Jello!")
+    request.send("Jello!")
 
 @app.route('/example.py')
-def ExamplePy(client):
+def ExamplePy(request):
     """ Serve a binary file. """
-    response = featherweb.HTTPResponse(client)
-    response.sendfile('/example.py')
+    request.sendfile('/example.py')
 
 def TimeoutCB():
     """ I'm bored.  What else needs to be done... """
