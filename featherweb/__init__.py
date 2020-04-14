@@ -26,15 +26,17 @@ class FeatherWeb(object):
         return _route
 
 
-    def run(self, timeout=5000, callback=None, **kwargs):
+    def run(self, timeout=5, callback=None, **kwargs):
         """ Run the request server forever.  If provided, a callback is fired with kwargs on the timeout interval.
             Returning False from timeout callback shall cause the request server to exit."""
+
+        self.m_Socket.settimeout(timeout)
 
         poller = select.poll()
         poller.register(self.m_Socket, select.POLLIN)
 
         while True:
-            events = poller.poll(timeout)
+            events = poller.poll(timeout*1000)
             if not events and callback:
                 if not callback(**kwargs):
                     break
@@ -132,4 +134,3 @@ class HTTPRequest():
                 if not data:
                     break
                 self.client.sendall(data)
-
