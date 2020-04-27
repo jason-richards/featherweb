@@ -101,7 +101,7 @@ class HTTPRequest():
 
 
     def __headers(self):
-        self.client.sendall("HTTP/1.0 %s NA\r\n" % self.status)
+        self.client.sendall("HTTP/1.0 %s OK\r\n" % self.status)
         self.client.sendall("Content-Type: ")
         self.client.sendall(self.content_type)
         if not self.headers:
