@@ -88,47 +88,88 @@ class FeatherWeb(object):
 
         poller.unregister(self.m_Socket)
 
-        
-class HTTPRequest():
 
-    def __init__(self, client, request, content_type="text/html; charset=utf-8", status="200", headers={}):
+HTTPStatusCodes = {
+    200 : 'OK',
+    201 : 'Created',
+    202 : 'Accepted',
+    203 : 'Non-Authoritative Information',
+    204 : 'No Content',
+    205 : 'Reset Content',
+    206 : 'Partial Content',
+    300 : 'Multiple Choices',
+    301 : 'Moved Permanently',
+    302 : 'Found',
+    303 : 'See Other',
+    304 : 'Not Modified',
+    305 : 'Use Proxy',
+    306 : '(Unused)',
+    307 : 'Temporary Redirect',
+    400 : 'Bad Request',
+    401 : 'Unauthorized',
+    402 : 'Payment Required',
+    403 : 'Forbidden',
+    404 : 'Not Found',
+    405 : 'Method Not Allowed',
+    406 : 'Not Acceptable',
+    407 : 'Proxy Authentication Required',
+    408 : 'Request Timeout',
+    409 : 'Conflict',
+    410 : 'Gone',
+    411 : 'Length Required',
+    412 : 'Precondition Failed',
+    413 : 'Request Entity Too Large',
+    414 : 'Request-URI Too Long',
+    415 : 'Unsupported Media Type',
+    416 : 'Requested Range Not Satisfiable',
+    417 : 'Expectation Failed',
+    500 : 'Internal Server Error',
+    501 : 'Not Implemented',
+    502 : 'Bad Gateway',
+    503 : 'Service Unavailable',
+    504 : 'Gateway Timeout',
+    505 : 'HTTP Version Not Supported'
+}
+
+class HTTPRequest():
+    method = None
+    path = None
+    proto = None
+    headers = {}
+
+    def __init__(self, client, request, headers={}):
         """ Utility object for HTTP request responses. """
         self.client = client
         self.method, self.path, self.proto = request.decode().split()
-        self.content_type = content_type
-        self.status = status
         self.headers = headers
 
-
-    def __headers(self):
-        self.client.sendall("HTTP/1.0 %s OK\r\n" % self.status)
+    def __headers(self, status, content_type, headers):
+        self.client.sendall("HTTP/1.1 %d %s\r\n" % (status, HTTPStatusCodes[status] if status in HTTPStatusCodes else "NA"))
         self.client.sendall("Content-Type: ")
-        self.client.sendall(self.content_type)
-        if not self.headers:
+        self.client.sendall(content_type)
+        if not headers:
             self.client.sendall("\r\n\r\n")
         else:
             self.client.sendall("\r\n")
-            if isinstance(self.headers, bytes) or isinstance(self.headers, str):
-                self.client.sendall(self.headers)
+            if isinstance(headers, bytes) or isinstance(headers, str):
+                self.client.sendall(headers)
             else:
-                for k, v in self.headers.items():
+                for k, v in self.items():
                     self.client.sendall(k)
                     self.client.sendall(": ")
                     self.client.sendall(v)
                     self.client.sendall("\r\n")
             self.client.sendall("\r\n")
 
-
-    def send(self, response):
+    def send(self, response='', status=200, content_type="text/html; charset=utf-8", headers=None):
         """ Send a textual response. """
-        self.__headers()
+        self.__headers(status, content_type, headers)
         self.client.sendall(response)
 
-
-    def sendfile(self, filename, chunksize=128):
+    def sendfile(self, filename, chunksize=128, status=200, content_type="text/html; charset=utf-8", headers=None):
         """ Send a file in response, one chunk at a time.  Caller handles exceptions. """
         with open(filename, 'rb') as f:
-            self.__headers()
+            self.__headers(status, content_type, headers)
             while True:
                 data = f.read(chunksize)
                 if not data:
