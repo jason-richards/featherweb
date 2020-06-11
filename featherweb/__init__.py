@@ -41,8 +41,7 @@ class FeatherWeb(object):
             try:
                 events = poller.poll(timeout*1000)
                 if not events and callback:
-                    if not callback(**kwargs):
-                        break
+                    running = callback(**kwargs):
                     continue
 
                 for fd, event in events:
@@ -83,12 +82,12 @@ class FeatherWeb(object):
 
                         handler(response)
 
-                    except Exception as e:
-                        client.sendall('HTTP/1.0 404 NA\r\n\r\n')
-
                     except KeyboardInterrupt:
                         print('Got Ctrl-C, shutting down...')
                         running = False
+
+                    except Exception as e:
+                        client.sendall('HTTP/1.0 404 NA\r\n\r\n')
 
                     finally:
                         client.close()
