@@ -10,6 +10,7 @@ class FeatherWeb(object):
     def __init__(self, addr='0.0.0.0', port=80, maxQ=5):
         address = socket.getaddrinfo(addr, port)[0][-1]
         self.m_Socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.m_Socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.m_Socket.bind(address)
         self.m_Socket.listen(maxQ)
         self.m_Socket.setblocking(True)
@@ -35,56 +36,66 @@ class FeatherWeb(object):
         poller = select.poll()
         poller.register(self.m_Socket, select.POLLIN)
 
-        while True:
-            events = poller.poll(timeout*1000)
-            if not events and callback:
-                if not callback(**kwargs):
-                    break
-                continue
-
-            for fd, event in events:
-                if event & select.POLLHUP or event & select.POLLERR:
-                    poller.unregister(self.m_Socket)
-                    raise Exception ("POLLHUP/POLLERR")
-
-                if id(fd) is not id(self.m_Socket) or not event & select.POLLIN:
+        running = True
+        while running:
+            try:
+                events = poller.poll(timeout*1000)
+                if not events and callback:
+                    if not callback(**kwargs):
+                        break
                     continue
 
-                client, address = self.m_Socket.accept()
+                for fd, event in events:
+                    if event & select.POLLHUP or event & select.POLLERR:
+                        poller.unregister(self.m_Socket)
+                        raise Exception ("POLLHUP/POLLERR")
 
-                try:
-                    f = client.makefile('rwb', 0)
+                    if id(fd) is not id(self.m_Socket) or not event & select.POLLIN:
+                        continue
 
-                    response = HTTPRequest(client, f.readline())
+                    client, address = self.m_Socket.accept()
 
-                    # This may be dangerous for the ESP8266.  Request headers may be extensively large - a simple
-                    # Request with lots of HTTP headers could cause OOM crash. Request headers may be 8-16KB!
-                    while True:
-                        line = f.readline()
-                        if not line or line == b'\r\n':
-                            break
-                        k, v = line.split(b":", 1)
-                        response.headers[k] = v.strip()
+                    try:
+                        f = client.makefile('rwb', 0)
 
-                    found = False
-                    for e in self.m_Routes:
-                        pattern = e[0]
-                        handler = e[1]
+                        response = HTTPRequest(client, f.readline())
 
-                        if response.path.split('?', 1)[0] == pattern:
-                            found = True
-                            break
+                        # This may be dangerous for the ESP8266.  Request headers may be extensively large - a simple
+                        # Request with lots of HTTP headers could cause OOM crash. Request headers may be 8-16KB!
+                        while True:
+                            line = f.readline()
+                            if not line or line == b'\r\n':
+                                break
+                            k, v = line.split(b":", 1)
+                            response.headers[k] = v.strip()
 
-                    if not found:
-                        raise
+                        found = False
+                        for e in self.m_Routes:
+                            pattern = e[0]
+                            handler = e[1]
 
-                    handler(response)
+                            if response.path.split('?', 1)[0] == pattern:
+                                found = True
+                                break
 
-                except Exception as e:
-                    client.sendall('HTTP/1.0 404 NA\r\n\r\n')
+                        if not found:
+                            raise
 
-                finally:
-                    client.close()
+                        handler(response)
+
+                    except Exception as e:
+                        client.sendall('HTTP/1.0 404 NA\r\n\r\n')
+
+                    except KeyboardInterrupt:
+                        print('Got Ctrl-C, shutting down...')
+                        running = False
+
+                    finally:
+                        client.close()
+
+            except KeyboardInterrupt:
+                print('Got Ctrl-C, shutting down...')
+                running = False
 
         poller.unregister(self.m_Socket)
 
