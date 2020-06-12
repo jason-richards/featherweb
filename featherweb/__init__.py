@@ -41,7 +41,7 @@ class FeatherWeb(object):
             try:
                 events = poller.poll(timeout*1000)
                 if not events and callback:
-                    running = callback(**kwargs):
+                    running = callback(**kwargs)
                     continue
 
                 for fd, event in events:
