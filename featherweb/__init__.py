@@ -15,7 +15,6 @@ class FeatherWeb(object):
         self.m_Socket.listen(maxQ)
         self.m_Socket.setblocking(True)
 
-
     def __del__(self):
         self.m_Socket.close()
 
@@ -33,8 +32,9 @@ class FeatherWeb(object):
 
         self.m_Socket.settimeout(timeout)
 
+        sockfd = self.m_Socket.makefile('rb')
         poller = select.poll()
-        poller.register(self.m_Socket, select.POLLIN)
+        poller.register(sockfd, select.POLLIN)
 
         running = True
         while running:
@@ -46,10 +46,10 @@ class FeatherWeb(object):
 
                 for fd, event in events:
                     if event & select.POLLHUP or event & select.POLLERR:
-                        poller.unregister(self.m_Socket)
+                        poller.unregister(sockfd)
                         raise Exception ("POLLHUP/POLLERR")
 
-                    if id(fd) is not id(self.m_Socket) or not event & select.POLLIN:
+                    if fd is not sockfd or not event & select.POLLIN:
                         continue
 
                     client, address = self.m_Socket.accept()
@@ -78,7 +78,7 @@ class FeatherWeb(object):
                                 break
 
                         if not found:
-                            raise
+                            raise Exception("Not Found")
 
                         handler(response)
 
@@ -96,7 +96,7 @@ class FeatherWeb(object):
                 print('Got Ctrl-C, shutting down...')
                 running = False
 
-        poller.unregister(self.m_Socket)
+        poller.unregister(sockfd)
 
 
 HTTPStatusCodes = {
