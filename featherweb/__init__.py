@@ -53,6 +53,7 @@ class FeatherWeb(object):
                         continue
 
                     client, address = self.m_Socket.accept()
+                    client.settimeout(timeout)
 
                     try:
                         f = client.makefile('rwb', 0)
