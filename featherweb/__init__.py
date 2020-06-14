@@ -1,6 +1,6 @@
 import usocket as socket
 import uselect as select
-
+import uerrno as errno
 
 class FeatherWeb(object):
     m_Socket = None
@@ -84,17 +84,16 @@ class FeatherWeb(object):
                         handler(response)
 
                     except KeyboardInterrupt:
-                        print('Got Ctrl-C, shutting down...')
                         running = False
 
                     except Exception as e:
-                        client.sendall('HTTP/1.0 404 NA\r\n\r\n')
+                        if e.args[0] != errno.ETIMEDOUT:
+                            client.sendall('HTTP/1.0 404 NA\r\n\r\n')
 
                     finally:
                         client.close()
 
             except KeyboardInterrupt:
-                print('Got Ctrl-C, shutting down...')
                 running = False
 
         poller.unregister(sockfd)
