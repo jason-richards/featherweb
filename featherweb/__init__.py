@@ -1,6 +1,13 @@
-import usocket as socket
-import uselect as select
-import uerrno as errno
+try:
+    import socket
+    import select
+    import errno
+    import sys
+except:
+    import usocket as socket
+    import uselect as select
+    import uerrno as errno
+
 
 class FeatherWeb(object):
     m_Address = None
@@ -37,6 +44,10 @@ class FeatherWeb(object):
         l_Socket.settimeout(timeout)
 
         sockfd = l_Socket.makefile('rb')
+        try:
+            sockfd = sockfd.fileno()
+        except:
+            pass
         poller = select.poll()
         poller.register(sockfd, select.POLLIN)
 
@@ -92,7 +103,7 @@ class FeatherWeb(object):
 
                     except Exception as e:
                         if e.args[0] != errno.ETIMEDOUT:
-                            client.sendall('HTTP/1.0 404 NA\r\n\r\n')
+                            client.sendall('HTTP/1.0 404 NA\r\n\r\n'.encode('utf-8'))
 
                     finally:
                         clientfd.close()
@@ -102,7 +113,10 @@ class FeatherWeb(object):
                 running = False
 
         poller.unregister(sockfd)
-        sockfd.close()
+        try:
+            sockfd.close()
+        except:
+            pass
         l_Socket.close()
 
 
@@ -161,27 +175,29 @@ class HTTPRequest():
         self.headers = headers
 
     def __headers(self, status, content_type, headers):
-        self.client.sendall("HTTP/1.1 %d %s\r\n" % (status, HTTPStatusCodes[status] if status in HTTPStatusCodes else "NA"))
-        self.client.sendall("Content-Type: ")
-        self.client.sendall(content_type)
+        self.client.sendall(("HTTP/1.1 %d %s\r\n" % (status, HTTPStatusCodes[status] if status in HTTPStatusCodes else "NA")).encode('utf-8'))
+        self.client.sendall("Content-Type: ".encode('utf-8'))
+        self.client.sendall(content_type.encode('utf-8'))
         if not headers:
-            self.client.sendall("\r\n\r\n")
+            self.client.sendall("\r\n\r\n".encode('utf-8'))
         else:
-            self.client.sendall("\r\n")
-            if isinstance(headers, bytes) or isinstance(headers, str):
+            self.client.sendall("\r\n".encode('utf-8'))
+            if isinstance(headers, bytes):
                 self.client.sendall(headers)
+            elif isinstance(headers, str):
+                self.client.sendall(headers.encode('utf-8'))
             else:
                 for k, v in self.items():
-                    self.client.sendall(k)
-                    self.client.sendall(": ")
-                    self.client.sendall(v)
-                    self.client.sendall("\r\n")
-            self.client.sendall("\r\n")
+                    self.client.sendall(k.encode('utf-8'))
+                    self.client.sendall(": ".encode('utf-8'))
+                    self.client.sendall(v.encode('utf-8'))
+                    self.client.sendall("\r\n".encode('utf-8'))
+            self.client.sendall("\r\n".encode('utf-8'))
 
     def send(self, response='', status=200, content_type="text/html; charset=utf-8", headers=None):
         """ Send a textual response. """
         self.__headers(status, content_type, headers)
-        self.client.sendall(response)
+        self.client.sendall(response.encode('utf-8') if isinstance(response, str) else response)
 
     def sendfile(self, filename, chunksize=128, status=200, content_type="text/html; charset=utf-8", headers=None):
         """ Send a file in response, one chunk at a time.  Caller handles exceptions. """
