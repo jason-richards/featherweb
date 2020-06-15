@@ -3,20 +3,17 @@ import uselect as select
 import uerrno as errno
 
 class FeatherWeb(object):
-    m_Socket = None
+    m_Address = None
+    m_Port = 80
+    m_MaxQ = 5
     m_Routes = []
 
 
-    def __init__(self, addr='0.0.0.0', port=80, maxQ=5):
-        address = socket.getaddrinfo(addr, port)[0][-1]
-        self.m_Socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.m_Socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.m_Socket.bind(address)
-        self.m_Socket.listen(maxQ)
-        self.m_Socket.setblocking(True)
-
-    def __del__(self):
-        self.m_Socket.close()
+    def __init__(self, addr='0.0.0.0', port=80, maxQ=5, insecureReuse=False):
+        self.m_Address = addr
+        self.m_Port = port
+        self.m_MaxQ = maxQ
+        self.m_InsecureReuse = insecureReuse
 
 
     def route(self, url, **kwargs):
@@ -30,9 +27,16 @@ class FeatherWeb(object):
         """ Run the request server forever.  If provided, a callback is fired with kwargs on the timeout interval.
             Returning False from timeout callback shall cause the request server to exit."""
 
-        self.m_Socket.settimeout(timeout)
+        address = socket.getaddrinfo(self.m_Address, self.m_Port)[0][-1]
+        l_Socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        if self.m_InsecureReuse:
+            l_Socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        l_Socket.bind(address)
+        l_Socket.listen(self.m_MaxQ)
+        l_Socket.setblocking(True)
+        l_Socket.settimeout(timeout)
 
-        sockfd = self.m_Socket.makefile('rb')
+        sockfd = l_Socket.makefile('rb')
         poller = select.poll()
         poller.register(sockfd, select.POLLIN)
 
@@ -52,18 +56,18 @@ class FeatherWeb(object):
                     if fd is not sockfd or not event & select.POLLIN:
                         continue
 
-                    client, address = self.m_Socket.accept()
+                    client, address = l_Socket.accept()
                     client.settimeout(timeout)
 
                     try:
-                        f = client.makefile('rwb', 0)
+                        clientfd = client.makefile('rwb', 0)
 
-                        response = HTTPRequest(client, f.readline())
+                        response = HTTPRequest(client, clientfd.readline())
 
                         # This may be dangerous for the ESP8266.  Request headers may be extensively large - a simple
                         # Request with lots of HTTP headers could cause OOM crash. Request headers may be 8-16KB!
                         while True:
-                            line = f.readline()
+                            line = clientfd.readline()
                             if not line or line == b'\r\n':
                                 break
                             k, v = line.split(b":", 1)
@@ -91,12 +95,15 @@ class FeatherWeb(object):
                             client.sendall('HTTP/1.0 404 NA\r\n\r\n')
 
                     finally:
+                        clientfd.close()
                         client.close()
 
             except KeyboardInterrupt:
                 running = False
 
         poller.unregister(sockfd)
+        sockfd.close()
+        l_Socket.close()
 
 
 HTTPStatusCodes = {
